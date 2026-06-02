@@ -10,14 +10,14 @@ final class PetWindowController {
 
     init(petDirectory: URL) throws {
         let sheetURL = try PetAsset.resolveSpritesheet(at: petDirectory)
-        let frames = try SpriteLoader.loadFrames(sheetURL: sheetURL, state: .idle)
+        let sprites = try SpriteLoader.loadSprites(sheetURL: sheetURL, motions: [.idle, .runRight, .runLeft, .wave])
 
         let size = NSSize(
             width: CGFloat(SpriteSheet.frameWidth) * Self.scale,
             height: CGFloat(SpriteSheet.frameHeight) * Self.scale
         )
 
-        petView = PetView(frames: frames, durationMs: SpriteState.idle.durationMs)
+        petView = PetView(sprites: sprites)
         panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],

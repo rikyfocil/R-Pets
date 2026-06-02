@@ -64,14 +64,40 @@ enum SpriteSheet {
     static let rows = 9
 }
 
+/// Motion states the skeleton can play — see MOTION.md §2 (0-indexed rows).
+enum MotionState: Hashable {
+    case idle       // row 0
+    case runRight   // row 1 — dragging toward the right
+    case runLeft    // row 2 — dragging toward the left
+    case wave       // row 3 — hover
+}
+
 /// One animation state: a row of the sheet looped at a fixed cadence.
 struct SpriteState {
     let row: Int         // 0-indexed row in the sheet
     let frames: Int      // populated frames (columns) in that row
     let durationMs: Int  // full-cycle duration
 
-    /// MOTION.md §2 — idle loops row 1 (1-indexed) == row 0 (0-indexed), 6 frames.
-    static let idle = SpriteState(row: 0, frames: 6, durationMs: 5500)
+    // MOTION.md §1 canonical row metadata (0-indexed rows).
+    static let idle     = SpriteState(row: 0, frames: 6, durationMs: 5500)
+    static let runRight = SpriteState(row: 1, frames: 8, durationMs: 1060)
+    static let runLeft  = SpriteState(row: 2, frames: 8, durationMs: 1060)
+    static let wave     = SpriteState(row: 3, frames: 4, durationMs: 700)
+
+    static func definition(for motion: MotionState) -> SpriteState {
+        switch motion {
+        case .idle:     return .idle
+        case .runRight: return .runRight
+        case .runLeft:  return .runLeft
+        case .wave:     return .wave
+        }
+    }
+}
+
+/// Decoded frames for one motion state, ready to animate.
+struct LoadedSprite {
+    let frames: [CGImage]
+    let durationMs: Int
 }
 
 enum SpriteLoaderError: Error {
@@ -81,13 +107,17 @@ enum SpriteLoaderError: Error {
 }
 
 enum SpriteLoader {
-    /// Crops the frames of `state` out of the sheet, left → right, top-left origin.
-    static func loadFrames(sheetURL: URL, state: SpriteState) throws -> [CGImage] {
+    /// Decodes a spritesheet image once.
+    static func decodeSheet(at url: URL) throws -> CGImage {
         guard
-            let source = CGImageSourceCreateWithURL(sheetURL as CFURL, nil),
+            let source = CGImageSourceCreateWithURL(url as CFURL, nil),
             let sheet = CGImageSourceCreateImageAtIndex(source, 0, nil)
-        else { throw SpriteLoaderError.cannotDecodeSheet(sheetURL) }
+        else { throw SpriteLoaderError.cannotDecodeSheet(url) }
+        return sheet
+    }
 
+    /// Crops the frames of `state` out of an already-decoded sheet, left → right, top-left origin.
+    static func frames(from sheet: CGImage, state: SpriteState) throws -> [CGImage] {
         var frames: [CGImage] = []
         frames.reserveCapacity(state.frames)
         for column in 0..<state.frames {
@@ -103,5 +133,16 @@ enum SpriteLoader {
             frames.append(frame)
         }
         return frames
+    }
+
+    /// Decodes the sheet once and loads every requested motion state.
+    static func loadSprites(sheetURL: URL, motions: [MotionState]) throws -> [MotionState: LoadedSprite] {
+        let sheet = try decodeSheet(at: sheetURL)
+        var sprites: [MotionState: LoadedSprite] = [:]
+        for motion in motions {
+            let state = SpriteState.definition(for: motion)
+            sprites[motion] = LoadedSprite(frames: try frames(from: sheet, state: state), durationMs: state.durationMs)
+        }
+        return sprites
     }
 }

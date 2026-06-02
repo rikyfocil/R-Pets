@@ -1,18 +1,27 @@
 import AppKit
 
-/// Layer-backed view that loops a sprite animation and lets the user drag the pet around.
+/// Layer-backed view that loops the pet's sprite animation, reacts to hover and drag, and lets the
+/// user drag the pet around. Precedence and per-state behavior follow MOTION.md §§2–4.
 final class PetView: NSView {
-    private let spriteLayer = CALayer()
-    private let frames: [CGImage]
-    private let durationMs: Int
-    private var animationStarted = false
+    /// Minimum per-event horizontal movement (points) to commit a drag direction — hysteresis (MOTION.md §4.2).
+    private static let dragDeadzone: CGFloat = 2.5
 
+    private let spriteLayer = CALayer()
+    private let sprites: [MotionState: LoadedSprite]
+
+    private var currentMotion: MotionState = .idle
+    private var didStartAnimating = false
+
+    private var isHovering = false
+    private var isDragging = false
+    private var dragDirection: MotionState?       // .runRight / .runLeft once a direction is detected
     private var dragMouseStart: NSPoint = .zero
     private var dragWindowStart: NSPoint = .zero
+    private var lastPointerX: CGFloat = 0
+    private var trackingArea: NSTrackingArea?
 
-    init(frames: [CGImage], durationMs: Int) {
-        self.frames = frames
-        self.durationMs = durationMs
+    init(sprites: [MotionState: LoadedSprite]) {
+        self.sprites = sprites
         super.init(frame: .zero)
         wantsLayer = true
         setupLayer()
@@ -24,7 +33,7 @@ final class PetView: NSView {
         spriteLayer.contentsGravity = .resizeAspect
         spriteLayer.magnificationFilter = .nearest    // crisp pixel art when scaling up
         spriteLayer.minificationFilter = .trilinear   // smooth when scaling down
-        spriteLayer.contents = frames.first
+        spriteLayer.contents = sprites[.idle]?.frames.first
         layer?.addSublayer(spriteLayer)
     }
 
@@ -33,7 +42,10 @@ final class PetView: NSView {
         guard window != nil else { return }
         spriteLayer.frame = bounds
         spriteLayer.contentsScale = window?.backingScaleFactor ?? 2
-        startIdleAnimationIfNeeded()
+        if !didStartAnimating {
+            didStartAnimating = true
+            play(currentMotion)
+        }
     }
 
     override func layout() {
@@ -41,36 +53,101 @@ final class PetView: NSView {
         spriteLayer.frame = bounds
     }
 
-    private func startIdleAnimationIfNeeded() {
-        guard !animationStarted, !frames.isEmpty else { return }
-        animationStarted = true
+    // MARK: - State resolution & playback
 
-        let animation = CAKeyframeAnimation(keyPath: "contents")
-        animation.values = frames
-        animation.calculationMode = .discrete
-        animation.keyTimes = (0..<frames.count).map { NSNumber(value: Double($0) / Double(frames.count)) }
-        animation.duration = Double(durationMs) / 1000.0
-        animation.repeatCount = .infinity
-        animation.isRemovedOnCompletion = false
-        spriteLayer.add(animation, forKey: "idle")
+    /// Picks the motion to display, by precedence: drag > hover > idle (MOTION.md §3).
+    private func resolveMotion() {
+        if isDragging {
+            // Keep the pre-drag/last animation until a clear horizontal direction is detected.
+            guard let dragDirection else { return }
+            play(dragDirection)
+        } else if isHovering {
+            play(.wave)
+        } else {
+            play(.idle)
+        }
     }
 
-    // MARK: - Dragging (move the borderless window with the cursor)
+    /// Swaps the looping animation, only when the target motion actually changes.
+    private func play(_ motion: MotionState) {
+        guard motion != currentMotion || spriteLayer.animation(forKey: "sprite") == nil else { return }
+        guard let sprite = sprites[motion], !sprite.frames.isEmpty else { return }
+        currentMotion = motion
+
+        let animation = CAKeyframeAnimation(keyPath: "contents")
+        animation.values = sprite.frames
+        animation.calculationMode = .discrete
+        animation.keyTimes = (0..<sprite.frames.count).map { NSNumber(value: Double($0) / Double(sprite.frames.count)) }
+        animation.duration = Double(sprite.durationMs) / 1000.0
+        animation.repeatCount = .infinity
+        animation.isRemovedOnCompletion = false
+        spriteLayer.contents = sprite.frames.first
+        spriteLayer.removeAnimation(forKey: "sprite")
+        spriteLayer.add(animation, forKey: "sprite")
+    }
+
+    // MARK: - Hover (MOTION.md §4.3)
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovering = true
+        resolveMotion()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovering = false
+        resolveMotion()
+    }
+
+    // MARK: - Dragging — move the window + run toward the drag direction (MOTION.md §4.2)
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
+        isDragging = true
+        dragDirection = nil
         dragMouseStart = NSEvent.mouseLocation
         dragWindowStart = window?.frame.origin ?? .zero
+        lastPointerX = dragMouseStart.x
+        // No direction yet → keep the current (pre-drag) animation.
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard let window else { return }
         let current = NSEvent.mouseLocation
-        let origin = NSPoint(
+
+        // Move the borderless window with the cursor.
+        window.setFrameOrigin(NSPoint(
             x: dragWindowStart.x + (current.x - dragMouseStart.x),
             y: dragWindowStart.y + (current.y - dragMouseStart.y)
-        )
-        window.setFrameOrigin(origin)
+        ))
+
+        // Commit a run direction from horizontal motion; keep-last on vertical/stationary moves.
+        let dx = current.x - lastPointerX
+        lastPointerX = current.x
+        if dx > Self.dragDeadzone {
+            dragDirection = .runRight
+        } else if dx < -Self.dragDeadzone {
+            dragDirection = .runLeft
+        }
+        resolveMotion()
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        isDragging = false
+        dragDirection = nil
+        resolveMotion()
     }
 }
