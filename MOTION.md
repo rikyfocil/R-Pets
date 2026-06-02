@@ -164,6 +164,9 @@ General active work. **Randomize between row 7 and row 8**:
 - Switching only at cycle boundaries means each row always plays a complete loop (no mid-cycle
   cuts).
 
+> **Implementation note (current build):** not yet wired — `working` currently loops **row 7 only**;
+> `reviewing` loops row 8. The 7/8 randomization is pending.
+
 ### 4.8 `reviewing` (row 8)
 Distinct review state → loop row 8 only, **no** randomization. (Row 8 thus appears both standalone
 here and inside `working`'s random pool — intentional.)

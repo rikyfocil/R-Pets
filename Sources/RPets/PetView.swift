@@ -12,6 +12,7 @@ final class PetView: NSView {
     private var currentMotion: MotionState = .idle
     private var didStartAnimating = false
 
+    private var sessionState: MotionState?       // externally-set state (ControlServer); nil == idle
     private var isHovering = false
     private var isDragging = false
     private var dragDirection: MotionState?       // .runRight / .runLeft once a direction is detected
@@ -55,7 +56,13 @@ final class PetView: NSView {
 
     // MARK: - State resolution & playback
 
-    /// Picks the motion to display, by precedence: drag > hover > idle (MOTION.md §3).
+    /// Sets the externally-driven session state (`nil` falls back to idle), then re-resolves.
+    func setSessionState(_ motion: MotionState?) {
+        sessionState = motion
+        resolveMotion()
+    }
+
+    /// Picks the motion to display, by precedence: drag > hover > session state > idle (MOTION.md §3).
     private func resolveMotion() {
         if isDragging {
             // Keep the pre-drag/last animation until a clear horizontal direction is detected.
@@ -63,6 +70,8 @@ final class PetView: NSView {
             play(dragDirection)
         } else if isHovering {
             play(.wave)
+        } else if let sessionState {
+            play(sessionState)
         } else {
             play(.idle)
         }

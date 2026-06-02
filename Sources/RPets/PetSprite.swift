@@ -64,12 +64,17 @@ enum SpriteSheet {
     static let rows = 9
 }
 
-/// Motion states the skeleton can play — see MOTION.md §2 (0-indexed rows).
-enum MotionState: Hashable {
-    case idle       // row 0
-    case runRight   // row 1 — dragging toward the right
-    case runLeft    // row 2 — dragging toward the left
-    case wave       // row 3 — hover
+/// Motion states the pet can play — see MOTION.md §2 (0-indexed rows).
+enum MotionState: Hashable, CaseIterable {
+    case idle        // row 0 — resting default
+    case runRight    // row 1 — dragging toward the right
+    case runLeft     // row 2 — dragging toward the left
+    case wave        // row 3 — hover / greeting
+    case completed   // row 4 — agent stopped / done
+    case failure     // row 5 — agent failed
+    case permission  // row 6 — awaiting approval
+    case working     // row 7 — general work
+    case reviewing   // row 8 — reviewing / thinking
 }
 
 /// One animation state: a row of the sheet looped at a fixed cadence.
@@ -79,17 +84,27 @@ struct SpriteState {
     let durationMs: Int  // full-cycle duration
 
     // MOTION.md §1 canonical row metadata (0-indexed rows).
-    static let idle     = SpriteState(row: 0, frames: 6, durationMs: 5500)
-    static let runRight = SpriteState(row: 1, frames: 8, durationMs: 1060)
-    static let runLeft  = SpriteState(row: 2, frames: 8, durationMs: 1060)
-    static let wave     = SpriteState(row: 3, frames: 4, durationMs: 700)
+    static let idle       = SpriteState(row: 0, frames: 6, durationMs: 5500)
+    static let runRight   = SpriteState(row: 1, frames: 8, durationMs: 1060)
+    static let runLeft    = SpriteState(row: 2, frames: 8, durationMs: 1060)
+    static let wave       = SpriteState(row: 3, frames: 4, durationMs: 700)
+    static let completed  = SpriteState(row: 4, frames: 5, durationMs: 840)
+    static let failure    = SpriteState(row: 5, frames: 8, durationMs: 1220)
+    static let permission = SpriteState(row: 6, frames: 6, durationMs: 1010)
+    static let working    = SpriteState(row: 7, frames: 6, durationMs: 820)
+    static let reviewing  = SpriteState(row: 8, frames: 6, durationMs: 1030)
 
     static func definition(for motion: MotionState) -> SpriteState {
         switch motion {
-        case .idle:     return .idle
-        case .runRight: return .runRight
-        case .runLeft:  return .runLeft
-        case .wave:     return .wave
+        case .idle:       return .idle
+        case .runRight:   return .runRight
+        case .runLeft:    return .runLeft
+        case .wave:       return .wave
+        case .completed:  return .completed
+        case .failure:    return .failure
+        case .permission: return .permission
+        case .working:    return .working
+        case .reviewing:  return .reviewing
         }
     }
 }

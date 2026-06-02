@@ -19,6 +19,26 @@
             "target": "RPets",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release RPets"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:RPets}",
+            "name": "Debug RPetsTester",
+            "target": "RPetsTester",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug RPetsTester"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:RPets}",
+            "name": "Release RPetsTester",
+            "target": "RPetsTester",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release RPetsTester"
         }
     ]
 }

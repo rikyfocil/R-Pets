@@ -101,6 +101,9 @@ Benefits: no zombie window after a crash, no missed-heartbeat edge cases, no rea
 
 ## 5. Transport & discovery
 
+> **Implemented today:** loopback TCP on port `51789`, fire-and-forget, no token/discovery yet —
+> see [§13](#13-implementation-status-current-build). The persistent-connection design below is the target.
+
 - **Transport:** persistent loopback connection. Recommended: **WebSocket over loopback TCP**
   (easy to speak from any language; a hook can even use `websocat`). A raw held-open framed-JSON
   TCP socket is an acceptable simpler alternative.
@@ -117,6 +120,10 @@ Benefits: no zombie window after a crash, no missed-heartbeat edge cases, no rea
 ---
 
 ## 6. Message protocol
+
+> **Implemented today:** a simpler flat `{ "action", "state", "message" }` command over
+> fire-and-forget loopback TCP — see [§13](#13-implementation-status-current-build). The
+> `type`-tagged envelope below is the target design.
 
 JSON messages over the open connection (NDJSON lines, or WebSocket text frames). Small, fixed set.
 
@@ -232,9 +239,78 @@ plugin catalog / plugin SDK · bundled abilities (reminders etc.) · per-pet-id 
 
 ## 12. Open questions / TODO
 
-- [ ] Confirm transport: WebSocket vs raw framed-JSON TCP.
+- [x] Transport for v0: **loopback raw framed-JSON TCP** (port 51789). WebSocket / persistent
+      connection deferred — see [§13](#13-implementation-status-current-build).
+- [ ] Revisit transport: WebSocket vs raw framed-JSON TCP for the persistent-connection model.
 - [ ] Pet appearance source: bundled sprite sets vs Lottie vs both. Decide authoring format.
 - [ ] Session-id sharing for the hooks channel (exact mechanism for `rpets-mcp` ↔ hooks).
 - [ ] Layout policy for many simultaneous pets (edge-dock? grid? user-arrangeable?).
 - [ ] Persistence: per-session position memory keyed by label.
 - [ ] Packaging / signing / launch-at-login for the menu-bar app.
+
+---
+
+## 13. Implementation status (current build)
+
+What is actually wired today (SPM package, two executable targets). Tracks the build against the
+design above; expect it to evolve.
+
+### Targets
+- **`RPets`** — the pet app (menu-bar `.accessory`, 🦦 status item). `swift run RPets`.
+- **`RPetsTester`** — a small windowed button panel that fires hardcoded commands for manual
+  testing. `swift run RPetsTester` (regular activation policy → Dock icon while running). For a
+  persistent, double-clickable Dock app named "RPets Tester", run `./Scripts/build-tester-app.sh`,
+  which wraps the binary in `.build/RPetsTester.app` (Info.plist + bundle).
+
+### Control transport — implemented
+- **Loopback TCP** via `Network.framework` `NWListener`, bound to **127.0.0.1 only**, port **51789**
+  (override with `RPETS_PORT`). Newline-delimited JSON, one command per line.
+- **Fire-and-forget**, *not yet* the persistent-connection lifecycle of §4: each command opens a
+  connection, sends one line, and closes. Pet lifetime is therefore **not** tied to a connection
+  yet (no auto-cleanup on disconnect).
+- **No token, no discovery file yet** (§5). Loopback-only binding is the current safeguard.
+
+### Command shape — implemented
+Flat object (not the `type`-tagged envelope of §6):
+```json
+{ "action": "create", "state": "working", "message": "Refactoring…" }
+```
+- `action`: `"create"` spawns a new pet; `"close"` closes the **most-recently-created** pet (LIFO —
+  no per-pet addressing yet, see "Not yet implemented" below).
+- `state`: one of `idle, working, reviewing, completed, failure, permission, wave`, plus synonyms
+  (`editing`/`running`→working, `thinking`/`review`→reviewing, `success`/`done`/`celebrating`→completed,
+  `failed`/`error`→failure, `approval`/`waiting`/`blocked`/`testing`→permission, `waving`/`hello`/`hi`→wave).
+  Maps to the MOTION.md §2 sprite rows; `idle` clears to the default.
+- `message`: non-empty → show bubble; `""` → hide; key omitted → leave unchanged. Body and bubble
+  are independent layers (§3 / MOTION.md §3).
+
+### Multi-pet — implemented (simplified)
+- App spawns pet #0 on launch; `action:"create"` adds more, staggered so they don't overlap.
+- `state`/`message` **broadcast to all pets** — no per-pet / per-session addressing yet. (The §4
+  one-connection-per-pet model is the eventual replacement.)
+
+### Bubble — implemented
+- `BubbleView`: a self-sizing rounded speech bubble in its own child `NSPanel` above the pet;
+  follows the pet when dragged, flips below the pet near the screen's top edge, click-through.
+- A **message-only** command (`{ "message": "…" }`, no `state`) shows a bubble without changing the
+  pet's animation — body and bubble are independent.
+
+### Bubble interaction (planned)
+How the user interacts with a bubble (design — not yet built):
+- **Click-through by default.** Bubbles never capture clicks, so they can't block dragging the pet
+  (today they're `ignoresMouseEvents = true`).
+- **Dismissal:**
+  - *Transient* bubbles (`say` / plain `message`) auto-dismiss after a TTL (e.g. 4 s, configurable).
+  - *Sticky* bubbles (`permission`) persist until the state clears.
+  - *Manual:* a single click on the **pet** (not a drag) dismisses its current bubble.
+- **Actionable bubbles** (later): a `permission` bubble may carry Approve/Deny buttons; that is the
+  one case where the bubble itself captures clicks and sends a response back on the connection.
+- **Settings surface** (menu-bar submenu / small Settings window) for global knobs: bubbles on/off,
+  auto-dismiss seconds, side (above/below), max width. This is where the "setting" idea fits —
+  global behavior, not per-bubble wiring.
+
+### Not yet implemented (vs the design above)
+Persistent connection = pet lifecycle (§4) · token auth + discovery file (§5) · per-pet/session
+addressing · `type`-tagged `session.start`/`state`/`react`/`say` envelope (§6) · say-sanitizer (§7) ·
+`working` 7/8 randomization (currently row 7 only; `reviewing` = row 8) · hooks channel + MCP shim
+(§9) · position persistence (§10).
