@@ -4,19 +4,22 @@ import Network
 /// A command to send to the running RPets app. Optionals are omitted from JSON when nil.
 struct OutgoingCommand: Encodable {
     var action: String? = nil
+    var session: String? = nil
     var state: String? = nil
     var message: String? = nil
 }
 
-/// Fires hardcoded test commands at the RPets control server over loopback TCP.
+/// Fires test commands at the RPets control server over loopback TCP. Each targets a session id.
 enum CommandSender {
     static let port: UInt16 = 51789
 
-    static func create()                                  { send(OutgoingCommand(action: "create")) }
-    static func close()                                   { send(OutgoingCommand(action: "close")) }
-    static func setState(_ state: String, message: String) { send(OutgoingCommand(state: state, message: message)) }
-    static func showBubble(_ text: String)                { send(OutgoingCommand(message: text)) }
-    static func hideBubble()                              { send(OutgoingCommand(message: "")) }
+    static func create(session: String) { send(OutgoingCommand(action: "create", session: session)) }
+    static func close(session: String)  { send(OutgoingCommand(action: "close", session: session)) }
+    static func setState(_ state: String, message: String, session: String) {
+        send(OutgoingCommand(session: session, state: state, message: message))
+    }
+    static func showBubble(_ text: String, session: String) { send(OutgoingCommand(session: session, message: text)) }
+    static func hideBubble(session: String)                 { send(OutgoingCommand(session: session, message: "")) }
 
     private static func send(_ command: OutgoingCommand) {
         guard let data = try? JSONEncoder().encode(command),

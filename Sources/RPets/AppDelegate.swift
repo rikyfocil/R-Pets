@@ -4,7 +4,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Default pet asset for the skeleton. Override by passing a pet directory as the first argument.
     private static let defaultPetPath = "/Users/rikyfocil/.codex/pets/pebble-otter"
 
-    private var pets: [PetWindowController] = []
+    private var petsBySession: [String: PetWindowController] = [:]
+    private var sessionOrder: [String] = []
+    private var anonymousCounter = 0
     private var sprites: [MotionState: LoadedSprite] = [:]
     private var statusItem: NSStatusItem?
     private var controlServer: ControlServer?
@@ -19,41 +21,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
             return
         }
-        createPet()
         setupStatusItem()
         startControlServer()
     }
 
-    // MARK: - Pets
+    // MARK: - Pets (keyed by session id)
 
-    /// Spawns a new pet window using the already-loaded sprites.
-    private func createPet() {
-        let controller = PetWindowController(sprites: sprites, index: pets.count)
+    @discardableResult
+    private func ensurePet(for session: String) -> PetWindowController {
+        if let existing = petsBySession[session] { return existing }
+        let controller = PetWindowController(sprites: sprites, index: sessionOrder.count)
         controller.show()
-        pets.append(controller)
-        FileHandle.standardError.write(Data("RPets: created pet #\(pets.count - 1) (total \(pets.count))\n".utf8))
+        petsBySession[session] = controller
+        sessionOrder.append(session)
+        log("created pet for session '\(session)' (total \(petsBySession.count))")
+        return controller
     }
 
-    /// Applies an external command: `action: "create"` spawns a pet; state/message broadcast to all pets.
-    private func handle(_ command: PetCommand) {
-        switch command.action?.lowercased() {
-        case "create": createPet()
-        case "close":  closeLastPet()
-        default:       break
-        }
-        for pet in pets {
-            pet.handle(command)
-        }
-    }
-
-    /// Closes the most recently created pet (LIFO). No per-pet addressing yet — see SPEC.md §13.
-    private func closeLastPet() {
-        guard let pet = pets.popLast() else {
-            FileHandle.standardError.write(Data("RPets: close ignored — no pets\n".utf8))
+    private func closePet(for session: String) {
+        guard let controller = petsBySession.removeValue(forKey: session) else {
+            log("close ignored — no pet for session '\(session)'")
             return
         }
-        pet.close()
-        FileHandle.standardError.write(Data("RPets: closed a pet (total \(pets.count))\n".utf8))
+        controller.close()
+        sessionOrder.removeAll { $0 == session }
+        log("closed pet for session '\(session)' (total \(petsBySession.count))")
+    }
+
+    /// Routes a command. With a session it targets (and auto-creates) that pet; without one it
+    /// falls back to the legacy broadcast + LIFO create/close.
+    private func handle(_ command: PetCommand) {
+        if let session = command.session?.trimmingCharacters(in: .whitespacesAndNewlines), !session.isEmpty {
+            if command.action?.lowercased() == "close" {
+                closePet(for: session)
+            } else {
+                ensurePet(for: session).handle(command)
+            }
+            return
+        }
+
+        switch command.action?.lowercased() {
+        case "create":
+            anonymousCounter += 1
+            ensurePet(for: "anon-\(anonymousCounter)")
+        case "close":
+            if let last = sessionOrder.last { closePet(for: last) }
+        default:
+            break
+        }
+        for session in sessionOrder {
+            petsBySession[session]?.handle(command)
+        }
     }
 
     // MARK: - Control server
@@ -83,5 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Quit RPets", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
+    }
+
+    private func log(_ message: String) {
+        FileHandle.standardError.write(Data("RPets: \(message)\n".utf8))
     }
 }

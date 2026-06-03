@@ -273,10 +273,12 @@ design above; expect it to evolve.
 ### Command shape — implemented
 Flat object (not the `type`-tagged envelope of §6):
 ```json
-{ "action": "create", "state": "working", "message": "Refactoring…" }
+{ "session": "my-session", "state": "working", "message": "Refactoring…" }
 ```
-- `action`: `"create"` spawns a new pet; `"close"` closes the **most-recently-created** pet (LIFO —
-  no per-pet addressing yet, see "Not yet implemented" below).
+- `session`: targets a specific pet. **Any command with a session auto-creates that pet** if it
+  does not exist; `action:"close"` with a session removes just that one. Pets are keyed by session id.
+- `action`: `"create"` (spawn) / `"close"` (remove). With a `session` they target that pet; without
+  one, `create` spawns an anonymous pet and `close` removes the most-recently-created (LIFO).
 - `state`: one of `idle, working, reviewing, completed, failure, permission, wave`, plus synonyms
   (`editing`/`running`→working, `thinking`/`review`→reviewing, `success`/`done`/`celebrating`→completed,
   `failed`/`error`→failure, `approval`/`waiting`/`blocked`/`testing`→permission, `waving`/`hello`/`hi`→wave).
@@ -284,10 +286,14 @@ Flat object (not the `type`-tagged envelope of §6):
 - `message`: non-empty → show bubble; `""` → hide; key omitted → leave unchanged. Body and bubble
   are independent layers (§3 / MOTION.md §3).
 
-### Multi-pet — implemented (simplified)
-- App spawns pet #0 on launch; `action:"create"` adds more, staggered so they don't overlap.
-- `state`/`message` **broadcast to all pets** — no per-pet / per-session addressing yet. (The §4
-  one-connection-per-pet model is the eventual replacement.)
+### Multi-pet — implemented (session-keyed)
+- **No pet on launch.** Pets are created on demand: the first command carrying a new `session`
+  spawns a pet for it (staggered so they don't overlap), held in a `[session: controller]` registry.
+- `state`/`message`/`close` with a `session` target **only that pet**.
+- A command with **no** `session` falls back to legacy: `state`/`message` broadcast to all pets,
+  `action:"create"` spawns an anonymous pet, `action:"close"` removes the most-recent (LIFO).
+- Tester: a session-id text field + **Create** spawns a pet; a **picker** chooses which session the
+  state/bubble/close buttons target.
 
 ### Bubble — implemented
 - `BubbleView`: a self-sizing rounded speech bubble in its own child `NSPanel` above the pet;
@@ -310,7 +316,7 @@ How the user interacts with a bubble (design — not yet built):
   global behavior, not per-bubble wiring.
 
 ### Not yet implemented (vs the design above)
-Persistent connection = pet lifecycle (§4) · token auth + discovery file (§5) · per-pet/session
-addressing · `type`-tagged `session.start`/`state`/`react`/`say` envelope (§6) · say-sanitizer (§7) ·
+Persistent connection = pet lifecycle (§4) · token auth + discovery file (§5) · `type`-tagged
+`session.start`/`state`/`react`/`say` envelope (§6) · say-sanitizer (§7) ·
 `working` 7/8 randomization (currently row 7 only; `reviewing` = row 8) · hooks channel + MCP shim
 (§9) · position persistence (§10).

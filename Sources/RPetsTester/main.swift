@@ -8,14 +8,13 @@ final class TesterAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let hosting = NSHostingView(rootView: TesterView())
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 240, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 260, height: 560),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "RPets Tester"
         window.contentView = hosting
-        window.setContentSize(hosting.fittingSize)
         window.center()
         window.makeKeyAndOrderFront(nil)
         self.window = window
