@@ -1,40 +1,69 @@
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Default pet asset for the skeleton. Override by passing a pet directory as the first argument.
-    private static let defaultPetPath = "/Users/rikyfocil/.codex/pets/pebble-otter"
+    private static let excludedPetsKey = "RPets.excludedPets"
+
+    private var allPets: [URL] = []
+    private var roster: PetRoster!
+    private var spriteCache: [URL: [MotionState: LoadedSprite]] = [:]
+    private var settingsController: SettingsWindowController?
 
     private var petsBySession: [String: PetWindowController] = [:]
     private var sessionOrder: [String] = []
     private var anonymousCounter = 0
-    private var sprites: [MotionState: LoadedSprite] = [:]
     private var statusItem: NSStatusItem?
     private var controlServer: ControlServer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let petDirectory = resolvePetDirectory()
-        do {
-            let sheetURL = try PetAsset.resolveSpritesheet(at: petDirectory)
-            sprites = try SpriteLoader.loadSprites(sheetURL: sheetURL, motions: MotionState.allCases)
-        } catch {
-            FileHandle.standardError.write(Data("RPets: failed to load pet at \(petDirectory.path): \(error)\n".utf8))
+        guard let fallback = Bundle.module.resourceURL?.appendingPathComponent("Pets/pebble-otter") else {
+            log("bundled fallback pet not found — cannot start")
             NSApp.terminate(nil)
             return
         }
+
+        allPets = PetRoster.discover(fallback: fallback).shuffled()
+
+        let excludedNames = Set(UserDefaults.standard.stringArray(forKey: Self.excludedPetsKey) ?? [])
+        let excluded = Set(allPets.filter { excludedNames.contains($0.lastPathComponent) })
+
+        roster = PetRoster(pets: allPets)
+        roster.excluded = excluded
+
+        log("discovered \(allPets.count) pet(s): \(allPets.map { $0.lastPathComponent }.joined(separator: ", "))")
         setupStatusItem()
         startControlServer()
+    }
+
+    // MARK: - Sprites
+
+    private func loadSprites(for petDirectory: URL) -> [MotionState: LoadedSprite]? {
+        if let cached = spriteCache[petDirectory] { return cached }
+        do {
+            let sheetURL = try PetAsset.resolveSpritesheet(at: petDirectory)
+            let sprites = try SpriteLoader.loadSprites(sheetURL: sheetURL, motions: MotionState.allCases)
+            spriteCache[petDirectory] = sprites
+            return sprites
+        } catch {
+            log("failed to load pet at \(petDirectory.path): \(error)")
+            return nil
+        }
     }
 
     // MARK: - Pets (keyed by session id)
 
     @discardableResult
-    private func ensurePet(for session: String) -> PetWindowController {
+    private func ensurePet(for session: String) -> PetWindowController? {
         if let existing = petsBySession[session] { return existing }
+        let petDirectory = roster.assign(to: session)
+        guard let sprites = loadSprites(for: petDirectory) else {
+            roster.release(session: session)
+            return nil
+        }
         let controller = PetWindowController(sprites: sprites, index: sessionOrder.count)
         controller.show()
         petsBySession[session] = controller
         sessionOrder.append(session)
-        log("created pet for session '\(session)' (total \(petsBySession.count))")
+        log("created pet '\(petDirectory.lastPathComponent)' for session '\(session)' (total \(petsBySession.count))")
         return controller
     }
 
@@ -45,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         controller.close()
         sessionOrder.removeAll { $0 == session }
+        roster.release(session: session)
         log("closed pet for session '\(session)' (total \(petsBySession.count))")
     }
 
@@ -55,7 +85,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if command.action?.lowercased() == "close" {
                 closePet(for: session)
             } else {
-                ensurePet(for: session).handle(command)
+                ensurePet(for: session)?.handle(command)
             }
             return
         }
@@ -74,6 +104,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Settings
+
+    @objc private func openSettings() {
+        if settingsController == nil {
+            settingsController = SettingsWindowController(allPets: allPets, excluded: roster.excluded)
+            settingsController?.onExclusionChange = { [weak self] excluded in
+                guard let self else { return }
+                self.roster.excluded = excluded
+                UserDefaults.standard.set(
+                    excluded.map { $0.lastPathComponent },
+                    forKey: Self.excludedPetsKey
+                )
+            }
+        }
+        settingsController?.show()
+    }
+
     // MARK: - Control server
 
     private func startControlServer() {
@@ -85,19 +132,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             server.start()
             controlServer = server
         } catch {
-            FileHandle.standardError.write(Data("RPets: control server failed to start on port \(port): \(error)\n".utf8))
+            log("control server failed to start on port \(port): \(error)")
         }
-    }
-
-    private func resolvePetDirectory() -> URL {
-        let path = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : Self.defaultPetPath
-        return URL(fileURLWithPath: path, isDirectory: true)
     }
 
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "🦦"
         let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit RPets", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item

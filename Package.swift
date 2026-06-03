@@ -7,7 +7,8 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "RPets",
-            path: "Sources/RPets"
+            path: "Sources/RPets",
+            resources: [.copy("Pets")]
         ),
         .executableTarget(
             name: "RPetsTester",
