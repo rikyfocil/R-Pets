@@ -39,6 +39,26 @@
             "target": "RPetsTester",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release RPetsTester"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:rpets-mcp}",
+            "name": "Debug RPetsMCP",
+            "target": "RPetsMCP",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug RPetsMCP"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:rpets-mcp}",
+            "name": "Release RPetsMCP",
+            "target": "RPetsMCP",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release RPetsMCP"
         }
     ]
 }
