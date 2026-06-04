@@ -34,6 +34,12 @@ SETTINGS_PATH      = _CLAUDE_DIR / "settings.json"
 # Identifies our entries in settings.json so remove() is surgical.
 HOOK_MARKER = str(HOOK_SCRIPT_DST)
 
+# MCP server binary — resolved relative to install.py so it works from any clone location.
+# .claude/hooks/install.py → ../../ = repo root → .build/…/RPetsMCP
+_REPO_ROOT      = Path(__file__).parent.parent.parent
+MCP_BINARY      = _REPO_ROOT / ".build/arm64-apple-macosx/release/RPetsMCP"
+MCP_SERVER_NAME = "rpets"
+
 # Events → async flag.  SessionEnd is synchronous so the close command
 # reaches the RPets app before the Claude Code process exits.
 EVENTS: dict[str, bool] = {
@@ -88,6 +94,37 @@ def is_our_hook(hook: dict) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# mcpServers helpers
+# ---------------------------------------------------------------------------
+
+def install_mcp(settings: dict) -> None:
+    """Add the RPetsMCP server entry to settings if the binary exists."""
+    if not MCP_BINARY.exists():
+        print(f"  Warning: MCP binary not found at {MCP_BINARY} — skipping mcpServers entry.")
+        print(f"           Run 'swift build -c release --product RPetsMCP' first.")
+        return
+    servers: dict = settings.setdefault("mcpServers", {})
+    if MCP_SERVER_NAME in servers:
+        print(f"  mcpServers.{MCP_SERVER_NAME} already present — binary updated in place.")
+    else:
+        print(f"  Added mcpServers.{MCP_SERVER_NAME} → {MCP_BINARY}")
+    # Always write the current binary path so re-running install picks up a new build.
+    servers[MCP_SERVER_NAME] = {"command": str(MCP_BINARY)}
+
+
+def remove_mcp(settings: dict) -> None:
+    """Remove the RPetsMCP server entry from settings."""
+    servers: dict = settings.get("mcpServers", {})
+    if MCP_SERVER_NAME in servers:
+        del servers[MCP_SERVER_NAME]
+        if not servers:
+            settings.pop("mcpServers", None)
+        print(f"  Removed mcpServers.{MCP_SERVER_NAME}")
+    else:
+        print(f"  mcpServers.{MCP_SERVER_NAME} not found — nothing to remove.")
+
+
+# ---------------------------------------------------------------------------
 # CLAUDE.md helpers
 # ---------------------------------------------------------------------------
 
@@ -137,6 +174,9 @@ def install() -> None:
         groups.append({"hooks": [make_hook_entry(event, is_async)]})
         added.append(event)
 
+    # 3. MCP server.
+    install_mcp(settings)
+
     save_settings(settings)
 
     if added:
@@ -144,12 +184,12 @@ def install() -> None:
     else:
         print("  Hook entries already present — script updated in place.")
 
-    # 3. Instructions.
+    # 4. Instructions.
     shutil.copy(INSTRUCTIONS_SRC, INSTRUCTIONS_DST)
     print(f"  Instructions → {INSTRUCTIONS_DST}")
     add_import()
 
-    print("Done. RPets hooks and instructions are now active globally.")
+    print("Done. RPets hooks, MCP server, and instructions are now active globally.")
 
 
 def remove() -> None:
@@ -175,6 +215,9 @@ def remove() -> None:
     if not event_hooks:
         settings.pop("hooks", None)
 
+    # 2. MCP server.
+    remove_mcp(settings)
+
     save_settings(settings)
 
     if removed_events:
@@ -182,7 +225,7 @@ def remove() -> None:
     else:
         print("  No RPets hook entries found in settings.")
 
-    # 2. Hook script.
+    # 3. Hook script.
     if HOOK_SCRIPT_DST.exists():
         HOOK_SCRIPT_DST.unlink()
         print(f"  Removed hook script: {HOOK_SCRIPT_DST}")

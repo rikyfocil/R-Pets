@@ -1,6 +1,6 @@
 import Foundation
 
-// Session ID resolution: --session <id>  >  RPETS_SESSION env  >  error
+// Session ID resolution: --session <id>  >  RPETS_SESSION  >  CLAUDE_CODE_SESSION_ID  >  bail
 var sessionId: String?
 
 var argIndex = 1
@@ -14,12 +14,11 @@ while argIndex < CommandLine.arguments.count {
     }
 }
 
-if sessionId == nil {
-    sessionId = ProcessInfo.processInfo.environment["RPETS_SESSION"]
-}
+let env = ProcessInfo.processInfo.environment
+sessionId = sessionId ?? env["RPETS_SESSION"] ?? env["CLAUDE_CODE_SESSION_ID"]
 
 guard let sessionId else {
-    fputs("RPetsMCP: --session <id> is required\n", stderr)
+    fputs("RPetsMCP: no session ID — pass --session <id>, set RPETS_SESSION, or run inside Claude Code\n", stderr)
     exit(1)
 }
 

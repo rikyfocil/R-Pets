@@ -6,13 +6,18 @@ final class PetWindowController {
     /// Display scale applied to the native 192×208 frame.
     private static let scale: CGFloat = 1
 
+    let petName: String
+    let sessionId: String
+
     private let panel: NSPanel
     private let petView: PetView
 
     private let bubblePanel: NSPanel
     private let bubbleView = BubbleView()
 
-    init(sprites: [MotionState: LoadedSprite], index: Int) {
+    init(sprites: [MotionState: LoadedSprite], index: Int, petName: String, sessionId: String) {
+        self.petName = petName
+        self.sessionId = sessionId
         let size = NSSize(
             width: CGFloat(SpriteSheet.frameWidth) * Self.scale,
             height: CGFloat(SpriteSheet.frameHeight) * Self.scale
@@ -56,21 +61,37 @@ final class PetWindowController {
     // MARK: - External command handling
 
     /// Applies a command: sets pet state and/or shows a bubble. Body and bubble are independent (MOTION.md §3).
+    /// Exception: a state change with no explicit `message` key auto-clears any stale bubble.
     func handle(_ command: PetCommand) {
+        var stateChanged = false
+
         if let stateString = command.state?.lowercased() {
             switch Self.resolveState(stateString) {
-            case .clear:           petView.setSessionState(nil)
-            case .set(let motion): petView.setSessionState(motion)
-            case .unknown:         break   // ignore unknown states, leave current
+            case .clear:
+                petView.setSessionState(nil)
+                log("state=\(stateString) → idle")
+                stateChanged = true
+            case .set(let motion):
+                petView.setSessionState(motion)
+                log("state=\(stateString) → \(motion)")
+                stateChanged = true
+            case .unknown:
+                log("state=\(stateString) → (unknown, ignored)")
             }
         }
 
         switch command.message {
         case .some(let text):
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty { hideBubble() } else { showBubble(trimmed) }
+            if trimmed.isEmpty {
+                hideBubble()
+                log("message cleared")
+            } else {
+                showBubble(trimmed)
+                log("message=\(trimmed.prefix(60))\(trimmed.count > 60 ? "…" : "")")
+            }
         case .none:
-            break   // no `message` key → leave the bubble unchanged
+            if stateChanged { hideBubble() }   // state transition clears stale bubbles
         }
     }
 
@@ -159,5 +180,9 @@ final class PetWindowController {
         let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let stagger = CGFloat(index) * 48   // offset each new pet so they don't perfectly overlap
         return NSPoint(x: visible.midX - size.width / 2 + stagger, y: visible.maxY - size.height - 140 - stagger)
+    }
+
+    private func log(_ message: String) {
+        FileHandle.standardError.write(Data("RPets [\(petName) | \(sessionId)]: \(message)\n".utf8))
     }
 }

@@ -59,7 +59,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             roster.release(session: session)
             return nil
         }
-        let controller = PetWindowController(sprites: sprites, index: sessionOrder.count)
+        let controller = PetWindowController(sprites: sprites, index: sessionOrder.count,
+                                             petName: petDirectory.lastPathComponent, sessionId: session)
         controller.show()
         petsBySession[session] = controller
         sessionOrder.append(session)
