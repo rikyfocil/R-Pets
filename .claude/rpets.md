@@ -53,6 +53,15 @@ Hooks drive state automatically for common activities (`editing`, `running`,
 
 ---
 
+### Mandatory checkpoints
+
+These two calls are required on every non-trivial task — do not skip them:
+
+1. **Before your first tool call:** `rpets_say` with a one-line description of what you are about to do (e.g. "Refactoring the auth module", "Fixing crash on symbol switch").
+2. **After final cleanup (commit merged, worktree removed):** `rpets_react` with `celebrating` on success or `error` on failure — exactly once.
+
+---
+
 ### When to stay silent
 
 The hook system already handles: file editing · bash execution · test runs ·
