@@ -37,7 +37,8 @@ HOOK_MARKER = str(HOOK_SCRIPT_DST)
 # MCP server binary — resolved relative to install.py so it works from any clone location.
 # .claude/hooks/install.py → ../../ = repo root → .build/…/RPetsMCP
 _REPO_ROOT      = Path(__file__).parent.parent.parent
-MCP_BINARY      = _REPO_ROOT / ".build/arm64-apple-macosx/release/RPetsMCP"
+MCP_BINARY_SRC  = _REPO_ROOT / ".build/arm64-apple-macosx/release/RPetsMCP"
+MCP_BINARY_DST  = _CLAUDE_DIR / "RPetsMCP"
 MCP_SERVER_NAME = "rpets"
 
 # Events → async flag.  SessionEnd is synchronous so the close command
@@ -98,22 +99,24 @@ def is_our_hook(hook: dict) -> bool:
 # ---------------------------------------------------------------------------
 
 def install_mcp(settings: dict) -> None:
-    """Add the RPetsMCP server entry to settings if the binary exists."""
-    if not MCP_BINARY.exists():
-        print(f"  Warning: MCP binary not found at {MCP_BINARY} — skipping mcpServers entry.")
+    """Copy the RPetsMCP binary to ~/.claude and register it in settings."""
+    if not MCP_BINARY_SRC.exists():
+        print(f"  Warning: MCP binary not found at {MCP_BINARY_SRC} — skipping mcpServers entry.")
         print(f"           Run 'swift build -c release --product RPetsMCP' first.")
         return
+    shutil.copy(MCP_BINARY_SRC, MCP_BINARY_DST)
+    MCP_BINARY_DST.chmod(0o755)
+    print(f"  MCP binary → {MCP_BINARY_DST}")
     servers: dict = settings.setdefault("mcpServers", {})
     if MCP_SERVER_NAME in servers:
         print(f"  mcpServers.{MCP_SERVER_NAME} already present — binary updated in place.")
     else:
-        print(f"  Added mcpServers.{MCP_SERVER_NAME} → {MCP_BINARY}")
-    # Always write the current binary path so re-running install picks up a new build.
-    servers[MCP_SERVER_NAME] = {"command": str(MCP_BINARY)}
+        print(f"  Added mcpServers.{MCP_SERVER_NAME} → {MCP_BINARY_DST}")
+    servers[MCP_SERVER_NAME] = {"command": str(MCP_BINARY_DST)}
 
 
 def remove_mcp(settings: dict) -> None:
-    """Remove the RPetsMCP server entry from settings."""
+    """Remove the RPetsMCP server entry from settings and delete the copied binary."""
     servers: dict = settings.get("mcpServers", {})
     if MCP_SERVER_NAME in servers:
         del servers[MCP_SERVER_NAME]
@@ -122,6 +125,9 @@ def remove_mcp(settings: dict) -> None:
         print(f"  Removed mcpServers.{MCP_SERVER_NAME}")
     else:
         print(f"  mcpServers.{MCP_SERVER_NAME} not found — nothing to remove.")
+    if MCP_BINARY_DST.exists():
+        MCP_BINARY_DST.unlink()
+        print(f"  Removed binary: {MCP_BINARY_DST}")
 
 
 # ---------------------------------------------------------------------------
