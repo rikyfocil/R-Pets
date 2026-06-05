@@ -11,6 +11,7 @@ Safe to run multiple times (install is idempotent; re-running updates files in p
 
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -98,33 +99,35 @@ def is_our_hook(hook: dict) -> bool:
 # mcpServers helpers
 # ---------------------------------------------------------------------------
 
-def install_mcp(settings: dict) -> None:
-    """Copy the RPetsMCP binary to ~/.claude and register it in settings."""
+def _run_claude_mcp(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["claude", "mcp", *args], capture_output=True, text=True)
+
+
+def install_mcp() -> None:
+    """Copy the RPetsMCP binary to ~/.claude and register it via the claude CLI (user scope)."""
     if not MCP_BINARY_SRC.exists():
-        print(f"  Warning: MCP binary not found at {MCP_BINARY_SRC} — skipping mcpServers entry.")
+        print(f"  Warning: MCP binary not found at {MCP_BINARY_SRC} — skipping MCP registration.")
         print(f"           Run 'swift build -c release --product RPetsMCP' first.")
         return
     shutil.copy(MCP_BINARY_SRC, MCP_BINARY_DST)
     MCP_BINARY_DST.chmod(0o755)
     print(f"  MCP binary → {MCP_BINARY_DST}")
-    servers: dict = settings.setdefault("mcpServers", {})
-    if MCP_SERVER_NAME in servers:
-        print(f"  mcpServers.{MCP_SERVER_NAME} already present — binary updated in place.")
+    # Remove first so re-running install is idempotent (add fails if name already exists).
+    _run_claude_mcp("remove", "--scope", "user", MCP_SERVER_NAME)
+    result = _run_claude_mcp("add", "--scope", "user", MCP_SERVER_NAME, str(MCP_BINARY_DST))
+    if result.returncode == 0:
+        print(f"  Registered '{MCP_SERVER_NAME}' via 'claude mcp add --scope user'")
     else:
-        print(f"  Added mcpServers.{MCP_SERVER_NAME} → {MCP_BINARY_DST}")
-    servers[MCP_SERVER_NAME] = {"command": str(MCP_BINARY_DST)}
+        print(f"  Warning: 'claude mcp add' failed: {(result.stderr or result.stdout).strip()}")
 
 
-def remove_mcp(settings: dict) -> None:
-    """Remove the RPetsMCP server entry from settings and delete the copied binary."""
-    servers: dict = settings.get("mcpServers", {})
-    if MCP_SERVER_NAME in servers:
-        del servers[MCP_SERVER_NAME]
-        if not servers:
-            settings.pop("mcpServers", None)
-        print(f"  Removed mcpServers.{MCP_SERVER_NAME}")
+def remove_mcp() -> None:
+    """Unregister RPetsMCP via the claude CLI and delete the copied binary."""
+    result = _run_claude_mcp("remove", "--scope", "user", MCP_SERVER_NAME)
+    if result.returncode == 0:
+        print(f"  Unregistered '{MCP_SERVER_NAME}' via 'claude mcp remove --scope user'")
     else:
-        print(f"  mcpServers.{MCP_SERVER_NAME} not found — nothing to remove.")
+        print(f"  Warning: 'claude mcp remove' failed: {(result.stderr or result.stdout).strip()}")
     if MCP_BINARY_DST.exists():
         MCP_BINARY_DST.unlink()
         print(f"  Removed binary: {MCP_BINARY_DST}")
@@ -180,10 +183,10 @@ def install() -> None:
         groups.append({"hooks": [make_hook_entry(event, is_async)]})
         added.append(event)
 
-    # 3. MCP server.
-    install_mcp(settings)
-
     save_settings(settings)
+
+    # 3. MCP server (after save_settings to avoid conflicting writes to settings.json).
+    install_mcp()
 
     if added:
         print(f"  Added hooks for: {', '.join(added)}")
@@ -221,15 +224,15 @@ def remove() -> None:
     if not event_hooks:
         settings.pop("hooks", None)
 
-    # 2. MCP server.
-    remove_mcp(settings)
-
     save_settings(settings)
 
     if removed_events:
         print(f"  Removed hooks for: {', '.join(sorted(removed_events))}")
     else:
         print("  No RPets hook entries found in settings.")
+
+    # 2. MCP server (after save_settings to avoid conflicting writes to settings.json).
+    remove_mcp()
 
     # 3. Hook script.
     if HOOK_SCRIPT_DST.exists():
