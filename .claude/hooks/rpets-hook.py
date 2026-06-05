@@ -74,10 +74,8 @@ def main() -> None:
     tool_input = hook.get("tool_input", {})
 
     if EVENT == "SessionStart":
-        source = hook.get("source", "startup")
-        # Treat resume/compact as already-active sessions; startup/clear as fresh.
-        state = "working" if source in ("resume", "compact") else "idle"
-        send(session, action="create", state=state)
+        # Always start idle — hooks will immediately update state if Claude is active.
+        send(session, action="create", state="idle")
 
     elif EVENT == "UserPromptSubmit":
         # User sent a message — Claude is now thinking about it.

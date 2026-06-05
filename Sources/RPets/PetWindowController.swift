@@ -2,12 +2,15 @@ import AppKit
 
 /// Builds and shows a single pet: a transparent, always-on-top, draggable panel, plus a speech
 /// bubble that floats above it. Routes external commands (ControlServer) to pet state + bubble.
-final class PetWindowController {
+final class PetWindowController: NSObject {
     /// Display scale applied to the native 192×208 frame.
     private static let scale: CGFloat = 1
 
     let petName: String
     let sessionId: String
+
+    /// Called when the user chooses "Close Pet" from the context menu.
+    var onClose: (() -> Void)?
 
     private let panel: NSPanel
     private let petView: PetView
@@ -37,10 +40,12 @@ final class PetWindowController {
             defer: false
         )
 
+        super.init()
         configurePetPanel(size: size, index: index)
         configureBubblePanel()
         panel.contentView = petView
         bubblePanel.contentView = bubbleView
+        petView.menu = makeContextMenu()
     }
 
     func show() {
@@ -127,7 +132,7 @@ final class PetWindowController {
         }
     }
 
-    private func hideBubble() {
+     @objc func hideBubble() {
         if bubblePanel.parent != nil {
             panel.removeChildWindow(bubblePanel)
         }
@@ -180,6 +185,47 @@ final class PetWindowController {
         let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
         let stagger = CGFloat(index) * 48   // offset each new pet so they don't perfectly overlap
         return NSPoint(x: visible.midX - size.width / 2 + stagger, y: visible.maxY - size.height - 140 - stagger)
+    }
+
+    // MARK: - Context menu
+
+    private func makeContextMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        
+        let labelItem = NSMenuItem(title: "\(petName)  ·  \(sessionId)", action: nil, keyEquivalent: "")
+        labelItem.isEnabled = false
+        menu.addItem(labelItem)
+
+        menu.addItem(.separator())
+
+        let idleItem = NSMenuItem(title: "Go Idle", action: #selector(goIdleFromMenu), keyEquivalent: "")
+        idleItem.target = self
+        idleItem.isEnabled = true
+        menu.addItem(idleItem)
+
+        let hideItem = NSMenuItem(title: "Hide Bubble", action: #selector(hideBubble), keyEquivalent: "")
+        hideItem.target = self
+        hideItem.isEnabled = true
+        menu.addItem(hideItem)
+
+        menu.addItem(.separator())
+
+        let closeItem = NSMenuItem(title: "Close Pet", action: #selector(closeFromMenu), keyEquivalent: "")
+        closeItem.target = self
+        closeItem.isEnabled = true
+        menu.addItem(closeItem)
+
+        return menu
+    }
+
+    @objc private func goIdleFromMenu() {
+        petView.setSessionState(nil)
+        hideBubble()
+    }
+
+    @objc private func closeFromMenu() {
+        onClose?()
     }
 
     private func log(_ message: String) {
