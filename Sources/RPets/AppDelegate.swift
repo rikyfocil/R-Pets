@@ -138,11 +138,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @objc private func refreshPets() {
+        guard let fallback = Bundle.module.resourceURL?.appendingPathComponent("Pets/pebble-otter") else { return }
+        allPets = PetRoster.discover(fallback: fallback).shuffled()
+        let newRoster = PetRoster(pets: allPets)
+        newRoster.excluded = roster.excluded
+        roster = newRoster
+        settingsController = nil   // discard; next open rebuilds with fresh pet list
+        log("refreshed: \(allPets.count) pet(s) discovered")
+    }
+
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "🦦"
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "Refresh Pets", action: #selector(refreshPets), keyEquivalent: "r"))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit RPets", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu

@@ -18,6 +18,13 @@ final class PetWindowController: NSObject {
     private let bubblePanel: NSPanel
     private let bubbleView = BubbleView()
 
+    // Tracks the current pet state so handle() can decide when to auto-dismiss.
+    private var currentSessionMotion: MotionState?
+    // True when the visible bubble was tagged as a permission-request bubble (via a
+    // "waiting" state transition while the bubble was showing). Only those bubbles
+    // are auto-dismissed when state returns to idle or working.
+    private var lastBubbleWasPermission = false
+
     init(sprites: [MotionState: LoadedSprite], index: Int, petName: String, sessionId: String) {
         self.petName = petName
         self.sessionId = sessionId
@@ -66,20 +73,21 @@ final class PetWindowController: NSObject {
     // MARK: - External command handling
 
     /// Applies a command: sets pet state and/or shows a bubble. Body and bubble are independent (MOTION.md §3).
-    /// Exception: a state change with no explicit `message` key auto-clears any stale bubble.
     func handle(_ command: PetCommand) {
-        var stateChanged = false
-
         if let stateString = command.state?.lowercased() {
             switch Self.resolveState(stateString) {
             case .clear:
+                currentSessionMotion = nil
                 petView.setSessionState(nil)
                 log("state=\(stateString) → idle")
-                stateChanged = true
             case .set(let motion):
+                // Tag the current bubble as permission-sourced when we enter the waiting state.
+                if motion == .permission && bubblePanel.parent != nil {
+                    lastBubbleWasPermission = true
+                }
+                currentSessionMotion = motion
                 petView.setSessionState(motion)
                 log("state=\(stateString) → \(motion)")
-                stateChanged = true
             case .unknown:
                 log("state=\(stateString) → (unknown, ignored)")
             }
@@ -96,7 +104,11 @@ final class PetWindowController: NSObject {
                 log("message=\(trimmed.prefix(60))\(trimmed.count > 60 ? "…" : "")")
             }
         case .none:
-            if stateChanged { hideBubble() }   // state transition clears stale bubbles
+            // Auto-dismiss only when returning to idle/working after a permission-request bubble.
+            let isIdleOrWorking = currentSessionMotion == nil || currentSessionMotion == .working
+            if lastBubbleWasPermission && isIdleOrWorking && bubblePanel.parent != nil {
+                hideBubble()
+            }
         }
     }
 
@@ -124,6 +136,7 @@ final class PetWindowController: NSObject {
     // MARK: - Bubble
 
     private func showBubble(_ text: String) {
+        bubbleView.onDismiss = { [weak self] in self?.hideBubble() }
         let size = bubbleView.update(text: text)
         bubblePanel.setContentSize(size)
         positionBubble(size: size)
@@ -132,7 +145,8 @@ final class PetWindowController: NSObject {
         }
     }
 
-     @objc func hideBubble() {
+    @objc func hideBubble() {
+        lastBubbleWasPermission = false
         if bubblePanel.parent != nil {
             panel.removeChildWindow(bubblePanel)
         }
@@ -176,7 +190,7 @@ final class PetWindowController: NSObject {
         bubblePanel.isOpaque = false
         bubblePanel.backgroundColor = .clear
         bubblePanel.hasShadow = false
-        bubblePanel.ignoresMouseEvents = true       // purely visual; clicks pass through
+        bubblePanel.ignoresMouseEvents = false      // needed for hover tracking and dismiss button
         bubblePanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         bubblePanel.hidesOnDeactivate = false
     }

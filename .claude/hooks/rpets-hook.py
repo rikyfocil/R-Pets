@@ -74,8 +74,7 @@ def main() -> None:
     tool_input = hook.get("tool_input", {})
 
     if EVENT == "SessionStart":
-        # Always start idle — hooks will immediately update state if Claude is active.
-        send(session, action="create", state="idle")
+        pass   # pet is created lazily on first state change, not eagerly on connect
 
     elif EVENT == "UserPromptSubmit":
         # User sent a message — Claude is now thinking about it.

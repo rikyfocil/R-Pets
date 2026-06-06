@@ -13,9 +13,6 @@ final class MCPServer {
     }
 
     func run() {
-        client.create()
-        log("session \(sessionId) created")
-
         while let line = readLine(strippingNewline: true) {
             guard !line.isEmpty else { continue }
             guard let data = line.data(using: .utf8),
