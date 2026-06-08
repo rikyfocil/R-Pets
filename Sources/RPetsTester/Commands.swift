@@ -15,7 +15,7 @@ enum CommandSender {
 
     static func create(session: String) { send(OutgoingCommand(action: "create", session: session)) }
     static func close(session: String)  { send(OutgoingCommand(action: "close", session: session)) }
-    static func setState(_ state: String, message: String, session: String) {
+    static func setState(_ state: String, message: String?, session: String) {
         send(OutgoingCommand(session: session, state: state, message: message))
     }
     static func showBubble(_ text: String, session: String) { send(OutgoingCommand(session: session, message: text)) }

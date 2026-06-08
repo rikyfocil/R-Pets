@@ -5,6 +5,9 @@ struct TesterView: View {
     @State private var sessions: [String] = []
     @State private var selected: String = ""
     @State private var newSession: String = "session-1"
+    /// When off, state buttons send `state` only — no `message` key at all (e.g. PostToolBatch);
+    /// when on, they send `state` + `message` together (e.g. the Notification hook).
+    @State private var sendMessageWithState = true
 
     var body: some View {
         VStack(spacing: 10) {
@@ -31,6 +34,10 @@ struct TesterView: View {
                     ForEach(sessions, id: \.self) { Text($0).tag($0) }
                 }
                 .pickerStyle(.menu)
+
+                Toggle("Send message with state", isOn: $sendMessageWithState)
+                    .toggleStyle(.checkbox)
+                    .font(.caption)
 
                 stateButton("🙂  Idle",       state: "idle",       message: "")
                 stateButton("⚙️  Working",    state: "working",    message: "Refactoring the parser…")
@@ -73,7 +80,9 @@ struct TesterView: View {
     }
 
     private func stateButton(_ title: String, state: String, message: String) -> some View {
-        Button(title) { CommandSender.setState(state, message: message, session: selected) }
-            .frame(maxWidth: .infinity)
+        Button(title) {
+            CommandSender.setState(state, message: sendMessageWithState ? message : nil, session: selected)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
