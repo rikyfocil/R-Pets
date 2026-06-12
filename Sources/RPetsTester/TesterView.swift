@@ -2,12 +2,19 @@ import SwiftUI
 
 /// A control panel: create pets per session id, pick which one to target, and fire commands at it.
 struct TesterView: View {
+    /// Controls what `message` (if any) the state buttons send alongside `state`.
+    enum MessageMode: String, CaseIterable, Identifiable {
+        case noMessage = "No message"
+        case defaultMessage = "Default message"
+        case customMessage = "Custom message"
+        var id: String { rawValue }
+    }
+
     @State private var sessions: [String] = []
     @State private var selected: String = ""
-    @State private var newSession: String = "session-1"
-    /// When off, state buttons send `state` only — no `message` key at all (e.g. PostToolBatch);
-    /// when on, they send `state` + `message` together (e.g. the Notification hook).
-    @State private var sendMessageWithState = true
+    @State private var newSession: String = TesterView.randomSessionId()
+    @State private var messageMode: MessageMode = .defaultMessage
+    @State private var customMessage: String = ""
 
     var body: some View {
         VStack(spacing: 10) {
@@ -35,9 +42,18 @@ struct TesterView: View {
                 }
                 .pickerStyle(.menu)
 
-                Toggle("Send message with state", isOn: $sendMessageWithState)
-                    .toggleStyle(.checkbox)
-                    .font(.caption)
+                Picker("Message", selection: $messageMode) {
+                    ForEach(MessageMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.caption)
+
+                if messageMode == .customMessage {
+                    TextField("Custom message", text: $customMessage)
+                        .textFieldStyle(.roundedBorder)
+                }
 
                 stateButton("🙂  Idle",       state: "idle",       message: "")
                 stateButton("⚙️  Working",    state: "working",    message: "Refactoring the parser…")
@@ -63,13 +79,17 @@ struct TesterView: View {
 
     private var trimmedNew: String { newSession.trimmingCharacters(in: .whitespaces) }
 
+    private static func randomSessionId() -> String {
+        "test-\(UUID().uuidString.lowercased())"
+    }
+
     private func createSession() {
         let id = trimmedNew
         guard !id.isEmpty else { return }
         CommandSender.create(session: id)
         if !sessions.contains(id) { sessions.append(id) }
         selected = id
-        newSession = ""
+        newSession = Self.randomSessionId()
     }
 
     private func closeSelected() {
@@ -81,7 +101,13 @@ struct TesterView: View {
 
     private func stateButton(_ title: String, state: String, message: String) -> some View {
         Button(title) {
-            CommandSender.setState(state, message: sendMessageWithState ? message : nil, session: selected)
+            let resolvedMessage: String?
+            switch messageMode {
+            case .noMessage: resolvedMessage = nil
+            case .defaultMessage: resolvedMessage = message
+            case .customMessage: resolvedMessage = customMessage
+            }
+            CommandSender.setState(state, message: resolvedMessage, session: selected)
         }
         .frame(maxWidth: .infinity)
     }
