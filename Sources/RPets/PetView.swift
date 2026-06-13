@@ -1,9 +1,9 @@
 import AppKit
 
 /// Layer-backed view that loops the pet's sprite animation, reacts to hover and drag, and lets the
-/// user drag the pet around. Precedence and per-state behavior follow MOTION.md §§2–4.
+/// user drag the pet around. Precedence and per-state behavior follow docs/MOTION.md §§2–4.
 final class PetView: NSView {
-    /// Minimum per-event horizontal movement (points) to commit a drag direction — hysteresis (MOTION.md §4.2).
+    /// Minimum per-event horizontal movement (points) to commit a drag direction — hysteresis (docs/MOTION.md §4.2).
     private static let dragDeadzone: CGFloat = 2.5
 
     private let spriteLayer = CALayer()
@@ -62,7 +62,7 @@ final class PetView: NSView {
         resolveMotion()
     }
 
-    /// Picks the motion to display, by precedence: drag > hover > session state > idle (MOTION.md §3).
+    /// Picks the motion to display, by precedence: drag > hover > session state > idle (docs/MOTION.md §3).
     private func resolveMotion() {
         if isDragging {
             // Keep the pre-drag/last animation until a clear horizontal direction is detected.
@@ -95,7 +95,7 @@ final class PetView: NSView {
         spriteLayer.add(animation, forKey: "sprite")
     }
 
-    // MARK: - Hover (MOTION.md §4.3)
+    // MARK: - Hover (docs/MOTION.md §4.3)
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -120,7 +120,7 @@ final class PetView: NSView {
         resolveMotion()
     }
 
-    // MARK: - Dragging — move the window + run toward the drag direction (MOTION.md §4.2)
+    // MARK: - Dragging — move the window + run toward the drag direction (docs/MOTION.md §4.2)
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 

@@ -1,6 +1,6 @@
 import Foundation
 
-/// An external control command (newline-delimited JSON over the ControlServer). See SPEC.md §6/§13.
+/// An external control command (newline-delimited JSON over the ControlServer). See docs/SPEC.md §6/§13.
 ///
 /// - `session`: targets a specific pet. Any command with a session auto-creates that pet if needed;
 ///   `action:"close"` with a session removes it. A command with no session falls back to the legacy

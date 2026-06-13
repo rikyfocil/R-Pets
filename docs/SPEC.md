@@ -282,9 +282,9 @@ Flat object (not the `type`-tagged envelope of §6):
 - `state`: one of `idle, working, reviewing, completed, failure, permission, wave`, plus synonyms
   (`editing`/`running`→working, `thinking`/`review`→reviewing, `success`/`done`/`celebrating`→completed,
   `failed`/`error`→failure, `approval`/`waiting`/`blocked`/`testing`→permission, `waving`/`hello`/`hi`→wave).
-  Maps to the MOTION.md §2 sprite rows; `idle` clears to the default.
+  Maps to the [MOTION.md](./MOTION.md) §2 sprite rows; `idle` clears to the default.
 - `message`: non-empty → show bubble; `""` → hide; key omitted → leave unchanged. Body and bubble
-  are independent layers (§3 / MOTION.md §3).
+  are independent layers (§3 / [MOTION.md](./MOTION.md) §3).
 
 ### Multi-pet — implemented (session-keyed)
 - **No pet on launch.** Pets are created on demand: the first command carrying a new `session`

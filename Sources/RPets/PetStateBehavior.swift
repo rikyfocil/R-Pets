@@ -1,13 +1,13 @@
 import Foundation
 
 /// What a currently-visible bubble represents — drives auto-dismiss and replacement-priority
-/// rules (MOTION.md §3, §4.6).
+/// rules (docs/MOTION.md §3, §4.6).
 enum BubblePriority {
     /// A normal status message (`say` / plain `message`). Replaceable at any time, and does not
     /// survive a session-state transition on its own.
     case normal
     /// A sticky approval prompt. No auto-dismiss TTL — it persists until the session leaves
-    /// `permission` (MOTION.md §4.6) — and briefly protects a fresh `normal` bubble from being
+    /// `permission` (docs/MOTION.md §4.6) — and briefly protects a fresh `normal` bubble from being
     /// replaced (§3, "message priorities").
     case permission
 }
@@ -35,7 +35,7 @@ protocol BubbleControlling: AnyObject {
 }
 
 /// Where a command's message originated — together with the current session motion, this informs
-/// a `PetStateBehavior`'s bubble priority decision (MOTION.md §3, "message priorities"). Parsed
+/// a `PetStateBehavior`'s bubble priority decision (docs/MOTION.md §3, "message priorities"). Parsed
 /// from `PetCommand.source`; missing or unrecognized values are treated as `.hook`, the more
 /// conservative choice (see `PermissionBubbleBehavior`).
 enum MessageSource: Equatable {
@@ -81,7 +81,7 @@ protocol PetStateBehavior: AnyObject {
 /// Default policy for states with no transition restrictions of their own: every transition is
 /// allowed immediately, and messages show/hide immediately.
 ///
-/// When `dismissesPermissionBubble` is set (idle and `working` — MOTION.md §4.6), a still-sticky
+/// When `dismissesPermissionBubble` is set (idle and `working` — docs/MOTION.md §4.6), a still-sticky
 /// permission bubble is dismissed on activation: "claude waiting input → working dismisses
 /// bubble". Other states (`failure`, `reviewing`, …) leave a sticky permission bubble for the
 /// user to dismiss.
@@ -113,11 +113,11 @@ final class StandardBubbleBehavior: PetStateBehavior {
     }
 }
 
-/// Policy for the `permission` session state (MOTION.md §4.6): the approval bubble is sticky
+/// Policy for the `permission` session state (docs/MOTION.md §4.6): the approval bubble is sticky
 /// (no auto-dismiss TTL), and a fresh `normal` bubble gets a brief grace period — `holdWindow` —
 /// before an incoming permission prompt is allowed to replace it, so the user has time to read
 /// it first. Resolving permission (a transition away) is always allowed immediately — only the
-/// bubble is sticky, per MOTION.md §4.6 ("When permission resolves … the body follows the new
+/// bubble is sticky, per docs/MOTION.md §4.6 ("When permission resolves … the body follows the new
 /// state").
 final class PermissionBubbleBehavior: PetStateBehavior {
     /// How long a fresh `normal` bubble protects itself from being replaced by a permission prompt.

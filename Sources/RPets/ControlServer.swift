@@ -6,7 +6,7 @@ enum ControlServerError: Error {
 }
 
 /// Loopback TCP server that receives newline-delimited JSON commands and forwards each one to a
-/// handler on the main queue. See SPEC.md §5–6.
+/// handler on the main queue. See docs/SPEC.md §5–6.
 ///
 /// Test from a shell:
 /// ```

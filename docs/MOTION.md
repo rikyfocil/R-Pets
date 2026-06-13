@@ -66,7 +66,7 @@ this format. Durations are inherited defaults and should be **retuned** for RPet
 ## 2. Motion states & row map
 
 RPets motion states fall in two groups. **Interaction** states are driven by the app/UI;
-**session** states are driven by the control protocol (SPEC.md §6).
+**session** states are driven by the control protocol ([SPEC.md](./SPEC.md) §6).
 
 | Motion state | Source | Row (1-idx) | Loops | Extra |
 |---|---|---|---|---|
@@ -227,7 +227,7 @@ retune per RPets state. Suggested starting durations:
 
 ## 7. Mapping from the control protocol → motion state
 
-SPEC.md §6 sends `state` / `react` messages. They resolve to motion states as:
+[SPEC.md](./SPEC.md) §6 sends `state` / `react` messages. They resolve to motion states as:
 
 | Protocol value | Motion state |
 |---|---|
@@ -243,7 +243,7 @@ SPEC.md §6 sends `state` / `react` messages. They resolve to motion states as:
 
 > The motion-state set here (idle / working / reviewing / completed / failure / permission +
 > interaction states) is the **refined, authoritative** set and supersedes the looser reaction
-> vocabulary in SPEC.md §6. Recommend updating SPEC.md §6 to this set, or keeping §6 as the wire
+> vocabulary in [SPEC.md](./SPEC.md) §6. Recommend updating [SPEC.md](./SPEC.md) §6 to this set, or keeping §6 as the wire
 > vocabulary and this table as the resolver.
 
 ---
@@ -259,4 +259,4 @@ SPEC.md §6 sends `state` / `react` messages. They resolve to motion states as:
       repeats.
 - [ ] Exact `permission` bubble copy.
 - [ ] Should `permission`/`failure` body motion survive a `hover` (precedence swap, §3)?
-- [ ] Reconcile SPEC.md §6 vocabulary with the motion-state set (§7).
+- [ ] Reconcile [SPEC.md](./SPEC.md) §6 vocabulary with the motion-state set (§7).

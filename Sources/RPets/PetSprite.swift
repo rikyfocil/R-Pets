@@ -55,7 +55,7 @@ enum PetAsset {
     }
 }
 
-/// Universal sprite-sheet contract — see MOTION.md §1.
+/// Universal sprite-sheet contract — see docs/MOTION.md §1.
 /// 8 columns × 9 rows of 192×208 frames (full sheet 1536×1872).
 enum SpriteSheet {
     static let frameWidth = 192
@@ -64,7 +64,7 @@ enum SpriteSheet {
     static let rows = 9
 }
 
-/// Motion states the pet can play — see MOTION.md §2 (0-indexed rows).
+/// Motion states the pet can play — see docs/MOTION.md §2 (0-indexed rows).
 enum MotionState: Hashable, CaseIterable {
     case idle        // row 0 — resting default
     case runRight    // row 1 — dragging toward the right
@@ -83,7 +83,7 @@ struct SpriteState {
     let frames: Int      // populated frames (columns) in that row
     let durationMs: Int  // full-cycle duration
 
-    // MOTION.md §1 canonical row metadata (0-indexed rows).
+    // docs/MOTION.md §1 canonical row metadata (0-indexed rows).
     static let idle       = SpriteState(row: 0, frames: 6, durationMs: 5500)
     static let runRight   = SpriteState(row: 1, frames: 8, durationMs: 1060)
     static let runLeft    = SpriteState(row: 2, frames: 8, durationMs: 1060)

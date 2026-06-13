@@ -80,7 +80,7 @@ final class PetWindowController: NSObject {
     // MARK: - External command handling
 
     /// Applies a command: requests a session-motion transition and/or shows a bubble. Body and
-    /// bubble are independent (MOTION.md §3) — the session state machine decides whether the
+    /// bubble are independent (docs/MOTION.md §3) — the session state machine decides whether the
     /// transition applies now, later, or not at all, and what happens to the bubble.
     func handle(_ command: PetCommand) {
         if let stateString = command.state?.lowercased() {
@@ -114,8 +114,8 @@ final class PetWindowController: NSObject {
         case unknown
     }
 
-    /// Maps a command's `state` string to a motion. Accepts the MOTION.md state names and the
-    /// SPEC.md §6 reaction vocabulary as synonyms.
+    /// Maps a command's `state` string to a motion. Accepts the docs/MOTION.md state names and the
+    /// docs/SPEC.md §6 reaction vocabulary as synonyms.
     private static func resolveState(_ value: String) -> StateResolution {
         switch value {
         case "idle":                                                    return .clear
