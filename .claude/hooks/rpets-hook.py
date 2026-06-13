@@ -41,7 +41,7 @@ def send(session: str, **fields) -> None:
     """Fire-and-forget a PetCommand to the RPets control server."""
     if not session:
         return
-    payload = (json.dumps({"session": session, **fields}) + "\n").encode()
+    payload = (json.dumps({"session": session, "source": "hook", **fields}) + "\n").encode()
     try:
         with socket.create_connection(("127.0.0.1", PORT), timeout=1) as sock:
             sock.sendall(payload)

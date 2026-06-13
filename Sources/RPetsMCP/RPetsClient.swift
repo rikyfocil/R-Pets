@@ -79,4 +79,6 @@ private struct OutgoingCommand: Encodable {
     var session: String?
     var state: String?
     var message: String?
+    /// Every command from this client is a deliberate MCP tool call — see `MessageSource`.
+    var source: String? = "mcp"
 }

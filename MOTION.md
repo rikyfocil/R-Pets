@@ -140,9 +140,16 @@ DEADZONE ≈ 2–3 px
 Pointer enters the pet's hittable region and is not dragging → loop row 3. Pointer leaves → revert
 to next-highest (session state or idle). Has no effect while dragging.
 
-### 4.4 `completed` (row 4) — sticky
+### 4.4 `completed` (row 4) — sticky, brief idle grace period
 Set when the agent stops / completes. Loops row 4 **indefinitely** ("always") until the session
 state changes again or the session ends. Not auto-cleared.
+
+A transition *to* `idle` is held for a grace period (default 20s — see `CompletedStateBehavior`
+in `Sources/RPets/PetStateBehavior.swift`) so the celebration is actually visible to the user — a
+routine "back to idle" ping right after completion (e.g. the `Stop` hook) doesn't cut it short.
+If nothing else happens first, the session settles to idle automatically once the grace period
+elapses. Any other transition (a new `permission`, `failure`, a re-issued `completed`, …)
+interrupts immediately — only the return to idle is held.
 
 ### 4.5 `failure` (row 5) — sticky
 Set on agent failure. Loops row 5 indefinitely until the state changes or the session ends.
@@ -182,6 +189,20 @@ here and inside `working`'s random pool — intentional.)
   it may cut in **immediately** (it's important and time-sensitive).
 - `rowStartTime` resets to "now" whenever the active row changes, so the new row starts at frame 0.
 - All of the above are tunable; defaults chosen for smooth-but-responsive feel.
+
+**Implementation note — per-state transition policies.** Each session motion state has an
+associated `PetStateBehavior` (`Sources/RPets/PetStateBehavior.swift`) that the active
+`PetSessionStateMachine` (`Sources/RPets/PetSessionStateMachine.swift`) consults on every incoming
+transition request. A behavior can:
+
+- **allow** the transition immediately,
+- **reject** it (stay in the current state), or
+- **delay** it — stay for now, but auto-apply later unless a different request preempts it first.
+
+This is also where per-state bubble policy lives (the sticky `permission` bubble and its hold-back
+window, §4.6). New "this state holds its ground for a bit" rules — like §4.4's `completed` grace
+period — belong here: this spec describes the *intent*, the behavior classes are the source of
+truth for exact numbers.
 
 ---
 

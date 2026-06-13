@@ -8,9 +8,13 @@ import Foundation
 /// - `action`:  `"create"` / `"close"`.
 /// - `state`:   sets the pet's session state.
 /// - `message`: non-empty shows the bubble; empty hides it; omitted leaves it unchanged.
+/// - `source`:  where the command originated — `"mcp"` for an `rpets_*` MCP tool call, `"hook"`
+///   for a Claude Code lifecycle hook. Affects bubble priority for `message` — see
+///   `MessageSource`.
 struct PetCommand: Decodable {
     let session: String?
     let action: String?
     let state: String?
     let message: String?
+    let source: String?
 }

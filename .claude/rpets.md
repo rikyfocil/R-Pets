@@ -58,7 +58,7 @@ Hooks drive state automatically for common activities (`editing`, `running`,
 These two calls are required on every non-trivial task — do not skip them:
 
 1. **Before your first tool call:** `rpets_say` with a one-line description of what you are about to do (e.g. "Refactoring the auth module", "Fixing crash on symbol switch").
-2. **After final cleanup (commit merged, worktree removed):** `rpets_react` with `celebrating` on success or `error` on failure — exactly once.
+2. **After completing a main task** (the user's request is fully delivered — changes verified, tests passing, etc.): `rpets_react` with `celebrating` on success or `error` on failure — exactly once. This triggers a jumping celebration that holds for ~20s before settling back to idle, so the user gets a clear "done" signal even if you don't say anything else.
 
 ---
 

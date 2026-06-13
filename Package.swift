@@ -17,6 +17,11 @@ let package = Package(
         .executableTarget(
             name: "RPetsMCP",
             path: "Sources/RPetsMCP"
+        ),
+        .testTarget(
+            name: "RPetsTests",
+            dependencies: ["RPets"],
+            path: "Tests/RPetsTests"
         )
     ]
 )
