@@ -14,6 +14,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var controlServer: ControlServer?
 
+    // Frames saved just before sleep so pets can be restored to their original screen on wake.
+    private var savedFrames: [String: NSRect] = [:]
+    private var pendingRecovery: DispatchWorkItem?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let fallback = Bundle.module.resourceURL?.appendingPathComponent("Pets/pebble-otter") else {
             log("bundled fallback pet not found — cannot start")
@@ -32,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         log("discovered \(allPets.count) pet(s): \(allPets.map { $0.lastPathComponent }.joined(separator: ", "))")
         setupStatusItem()
         startControlServer()
+        setupScreenRecovery()
     }
 
     // MARK: - Sprites
@@ -158,6 +163,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Quit RPets", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
+    }
+
+    // MARK: - Screen recovery
+
+    private func setupScreenRecovery() {
+        let wsCenter = NSWorkspace.shared.notificationCenter
+        wsCenter.addObserver(self, selector: #selector(systemWillSleep),
+                             name: NSWorkspace.willSleepNotification, object: nil)
+        wsCenter.addObserver(self, selector: #selector(systemDidWake),
+                             name: NSWorkspace.didWakeNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(screensDidChange),
+                                               name: NSApplication.didChangeScreenParametersNotification,
+                                               object: nil)
+    }
+
+    @objc private func systemWillSleep() {
+        savedFrames = petsBySession.mapValues { $0.currentFrame }
+        log("sleep — saved frames for \(savedFrames.count) pet(s)")
+    }
+
+    @objc private func systemDidWake() {
+        // Wait briefly for monitors to reconnect before attempting recovery.
+        scheduleRecovery(after: 5)
+    }
+
+    @objc private func screensDidChange() {
+        guard !savedFrames.isEmpty else { return }
+        scheduleRecovery(after: 0.3)
+    }
+
+    private func scheduleRecovery(after delay: TimeInterval) {
+        pendingRecovery?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.recoverAllPets() }
+        pendingRecovery = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func recoverAllPets() {
+        guard !savedFrames.isEmpty else { return }
+        var restoredCount = 0
+        for (session, controller) in petsBySession {
+            let saved = savedFrames[session] ?? controller.currentFrame
+            controller.recoverAfterScreenChange(savedFrame: saved)
+            // Once the saved screen is back, drop the entry so future screen events don't
+            // forcibly reposition a pet the user may have deliberately moved.
+            if NSScreen.screens.contains(where: { $0.frame.intersects(saved) }) {
+                savedFrames.removeValue(forKey: session)
+                restoredCount += 1
+            }
+        }
+        if restoredCount > 0 {
+            log("restored \(restoredCount) pet(s) to their pre-sleep screen")
+        }
     }
 
     private func log(_ message: String) {

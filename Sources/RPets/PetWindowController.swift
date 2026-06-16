@@ -174,9 +174,37 @@ final class PetWindowController: NSObject {
     }
 
     private func defaultOrigin(for size: NSSize, index: Int) -> NSPoint {
-        let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        guard let visible = NSScreen.main?.visibleFrame else { return .zero }   // no screen info — default to (0, 0)
         let stagger = CGFloat(index) * 48   // offset each new pet so they don't perfectly overlap
         return NSPoint(x: visible.midX - size.width / 2 + stagger, y: visible.maxY - size.height - 140 - stagger)
+    }
+
+    // MARK: - Screen recovery
+
+    var currentFrame: NSRect { panel.frame }
+
+    /// Called after a screen configuration change (wake from sleep, monitor reconnect).
+    ///
+    /// If `savedFrame` is now on a valid screen (the monitor came back), the panel is restored to
+    /// that exact frame. If the saved screen is still absent but the pet has drifted off every
+    /// visible screen, it is snapped to the nearest on-screen position on the main display.
+    func recoverAfterScreenChange(savedFrame: NSRect) {
+        let savedIsOnScreen = NSScreen.screens.contains { $0.frame.intersects(savedFrame) }
+        if savedIsOnScreen {
+            panel.setFrame(savedFrame, display: true)
+            panel.orderFrontRegardless()
+            return
+        }
+        // Saved screen is still not back — only act if we're currently off every screen.
+        let center = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
+        let isOnScreen = NSScreen.screens.contains { $0.frame.contains(center) }
+        guard !isOnScreen, let visible = NSScreen.main?.visibleFrame else { return }
+        let size = panel.frame.size
+        let origin = NSPoint(
+            x: min(max(panel.frame.origin.x, visible.minX), visible.maxX - size.width),
+            y: min(max(panel.frame.origin.y, visible.minY), visible.maxY - size.height)
+        )
+        panel.setFrameOrigin(origin)
     }
 
     // MARK: - Context menu
