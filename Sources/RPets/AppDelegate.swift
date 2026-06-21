@@ -14,6 +14,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var controlServer: ControlServer?
 
+    /// Global "Hide All Pets" toggle — applies to existing pets immediately and to any pet
+    /// created while active, so newly-routed sessions don't pop on screen unexpectedly.
+    private var petsHidden = false
+    private var hideToggleItem: NSMenuItem?
+
     // Frames saved just before sleep so pets can be restored to their original screen on wake.
     private var savedFrames: [String: NSRect] = [:]
     private var pendingRecovery: DispatchWorkItem?
@@ -68,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                              petName: petDirectory.lastPathComponent, sessionId: session)
         controller.onClose = { [weak self] in self?.closePet(for: session) }
         controller.show()
+        if petsHidden { controller.hide() }
         petsBySession[session] = controller
         sessionOrder.append(session)
         log("created pet '\(petDirectory.lastPathComponent)' for session '\(session)' (total \(petsBySession.count))")
@@ -153,12 +159,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         log("refreshed: \(allPets.count) pet(s) discovered")
     }
 
+    @objc private func toggleHideAllPets() {
+        petsHidden.toggle()
+        for controller in petsBySession.values {
+            petsHidden ? controller.hide() : controller.unhide()
+        }
+        hideToggleItem?.title = petsHidden ? "Show All Pets" : "Hide All Pets"
+        log(petsHidden ? "hid all pets" : "unhid all pets")
+    }
+
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "🦦"
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "Refresh Pets", action: #selector(refreshPets), keyEquivalent: "r"))
+        let hideItem = NSMenuItem(title: "Hide All Pets", action: #selector(toggleHideAllPets), keyEquivalent: "h")
+        menu.addItem(hideItem)
+        hideToggleItem = hideItem
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit RPets", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu

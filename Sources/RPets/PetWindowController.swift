@@ -62,8 +62,29 @@ final class PetWindowController: NSObject {
         petView.menu = makeContextMenu()
     }
 
+    /// True while this pet is hidden via "Hide All Pets" — the panel still tracks its session and
+    /// last position, it is just kept off-screen until unhidden.
+    private(set) var isHidden = false
+
     func show() {
         panel.orderFrontRegardless()
+    }
+
+    /// Removes the pet (and its bubble) from the screen without closing it — position and session
+    /// tracking are preserved so `unhide()` restores it exactly where it was.
+    func hide() {
+        guard !isHidden else { return }
+        isHidden = true
+        if isBubbleShowing { bubblePanel.orderOut(nil) }
+        panel.orderOut(nil)
+    }
+
+    /// Brings a previously hidden pet back on-screen at its last position.
+    func unhide() {
+        guard isHidden else { return }
+        isHidden = false
+        panel.orderFrontRegardless()
+        if isBubbleShowing { bubblePanel.orderFrontRegardless() }
     }
 
     /// Tears down this pet's windows (bubble + pet). The controller should then be released.
@@ -192,7 +213,7 @@ final class PetWindowController: NSObject {
         let savedIsOnScreen = NSScreen.screens.contains { $0.frame.intersects(savedFrame) }
         if savedIsOnScreen {
             panel.setFrame(savedFrame, display: true)
-            panel.orderFrontRegardless()
+            if !isHidden { panel.orderFrontRegardless() }
             return
         }
         // Saved screen is still not back — only act if we're currently off every screen.
