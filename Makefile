@@ -1,4 +1,4 @@
-.PHONY: install remove
+.PHONY: install remove app
 
 install:
 	swift build -c release --product RPetsMCP
@@ -6,3 +6,6 @@ install:
 
 remove:
 	python3 .claude/hooks/install.py remove
+
+app:
+	./Scripts/build-app.sh release

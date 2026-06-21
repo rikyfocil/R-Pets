@@ -58,6 +58,20 @@ Use a custom port for testing:
 RPETS_PORT=51800 swift run RPets
 ```
 
+### Building a Standalone .app
+
+Bundle RPets as a proper macOS app you can drop into `/Applications`:
+
+```bash
+make app
+```
+
+This builds a release binary and produces `.build/RPets.app`. Copy it into `/Applications` (or anywhere else):
+
+```bash
+cp -R .build/RPets.app /Applications/
+```
+
 ## Claude Integration
 
 Install the MCP server, hook script, and Claude instructions:
